@@ -50,23 +50,26 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
 
             ///////////////////////////////////////////////////////////////////////////////////////////
             //Add your FORK output here
-            execution += std::to_string(current_time) + ", 2, cloning the PCB\n";
-            current_time += 2;
+            execution += std::to_string(current_time) + ", " +std::to_string(duration_intr) +" , cloning the PCB\n";
+            current_time += duration_intr;
 
             // simulate fork creating a new child PCB
-            PCB child(current.PID + 1, current.PID, current.program_name + "_child", current.size, current.partition_number);
+            PCB child(current.PID + 1, current.PID, current.program_name, current.size, -1);
+            
+            // Allocate new memory partition for the child
+            if(!allocate_memory(&child)) {
+            	std::cerr << "ERROR: Memory allocation failed\n";
+            	}
             wait_queue.push_back(current); // parent waits, child runs
+            
 
             // Display system PCB table
-            system_status += "time: " + std::to_string(current_time) + ", after FORK\n";
+            system_status += "time: " + std::to_string(current_time) + "; current trace: " + trace + "\n";
             system_status += print_PCB(child, wait_queue);
             system_status += "\n";
-
-            execution += std::to_string(current_time) + ", 1, scheduler called\n";
-            current_time += 1;
-
-            execution += std::to_string(current_time) + ", 1, IRET\n";
-            current_time += 1;
+	    execution += std::to_string(current_time) + ", 0, scheduler called\n";
+	    execution += std::to_string(current_time) + ", 1, IRET\n";
+	    current_time += 1;
 
 	    
 		
@@ -111,14 +114,15 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
             ///////////////////////////////////////////////////////////////////////////////////////////
             //With the child's trace, run the child (HINT: think recursion)
 	    if(!child_trace.empty()) {
-                auto [child_exec, child_status, new_time] =
-                    simulate_trace(child_trace, current_time, vectors, delays, external_files, child,wait_queue);
+                auto [child_exec, child_status, new_time] =simulate_trace(child_trace, current_time, vectors, delays, external_files, child,wait_queue);
                 execution += child_exec;
                 system_status += child_status;
                 current_time = new_time;
             } else {
                 execution += std::to_string(current_time) + ", 0, no child trace found\n";
             }
+            wait_queue.clear(); 
+            current.program_name = "init"; 
 
 
             ///////////////////////////////////////////////////////////////////////////////////////////
@@ -131,6 +135,30 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
 
             ///////////////////////////////////////////////////////////////////////////////////////////
             //Add your EXEC output here
+            unsigned int prog_size = get_size(program_name, external_files);
+            if(prog_size == (unsigned int)-1 || prog_size == 0) prog_size = 1;
+
+           execution += std::to_string(current_time) + ", " + std::to_string(duration_intr) +
+             ", Program is " + std::to_string(prog_size) + " Mb large\n";
+             current_time += duration_intr;
+             int load_time = prog_size * 15;
+             execution += std::to_string(current_time) + ", " + std::to_string(load_time) + ", loading program into memory\n";
+             current_time += load_time;
+             execution += std::to_string(current_time) + ", 3, marking partition as occupied\n";
+             current_time += 3;
+             execution += std::to_string(current_time) + ", 6, updating PCB\n";
+             current_time += 6;
+             execution += std::to_string(current_time) + ", 0, scheduler called\n";
+             execution += std::to_string(current_time) + ", 1, IRET\n";
+             current_time += 1;
+             current.program_name = program_name;
+             current.size = prog_size;
+             allocate_memory(&current);
+
+
+            system_status += "time: " + std::to_string(current_time) + "; current trace: " + trace + "\n";
+            system_status += print_PCB(current, wait_queue);
+            system_status += "\n";
 
 
 
@@ -147,6 +175,17 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
 
             ///////////////////////////////////////////////////////////////////////////////////////////
             //With the exec's trace (i.e. trace of external program), run the exec (HINT: think recursion)
+            if(!exec_traces.empty()) {
+                auto [e_exec, e_status, new_time] =
+                    simulate_trace(exec_traces, current_time, vectors, delays, external_files, current, wait_queue);
+                execution += e_exec;
+                system_status += e_status;
+                current_time = new_time;
+            } else {
+                execution += std::to_string(current_time) + ", 0, exec program has no trace\n";
+            }
+            
+            wait_queue.clear();
 
 
 
@@ -183,7 +222,7 @@ int main(int argc, char** argv) {
     std::vector<PCB> wait_queue;
 
     /******************ADD YOUR VARIABLES HERE*************************/
-
+    int child_exit_value = 0;
 
     /******************************************************************/
 
