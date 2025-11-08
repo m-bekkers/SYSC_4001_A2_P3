@@ -62,14 +62,15 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
             	}
             wait_queue.push_back(current); // parent waits, child runs
             
-
+	    execution += std::to_string(current_time) + ", 0, scheduler called\n";
+	    execution += std::to_string(current_time) + ", 1, IRET\n";
+	    current_time += 1;
+	    
             // Display system PCB table
             system_status += "time: " + std::to_string(current_time) + "; current trace: " + trace + "\n";
             system_status += print_PCB(child, wait_queue);
             system_status += "\n";
-	    execution += std::to_string(current_time) + ", 0, scheduler called\n";
-	    execution += std::to_string(current_time) + ", 1, IRET\n";
-	    current_time += 1;
+	    
 
 	    
 		
@@ -118,12 +119,16 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
                 execution += child_exec;
                 system_status += child_status;
                 current_time = new_time;
+                free_memory(&child);
+                
+                if (!wait_queue.empty()) {
+       		   wait_queue.pop_back();
+       		}
+
             } else {
                 execution += std::to_string(current_time) + ", 0, no child trace found\n";
             }
-            wait_queue.clear(); 
-            current.program_name = "init"; 
-
+            
 
             ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -138,7 +143,7 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
             unsigned int prog_size = get_size(program_name, external_files);
             if(prog_size == (unsigned int)-1 || prog_size == 0) prog_size = 1;
 
-           execution += std::to_string(current_time) + ", " + std::to_string(duration_intr) +
+             execution += std::to_string(current_time) + ", " + std::to_string(duration_intr) +
              ", Program is " + std::to_string(prog_size) + " Mb large\n";
              current_time += duration_intr;
              int load_time = prog_size * 15;
@@ -153,12 +158,19 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
              current_time += 1;
              current.program_name = program_name;
              current.size = prog_size;
-             allocate_memory(&current);
+             
+             if(current.partition_number != -1) {
+             	free_memory(&current);
+             }
+             current.program_name = program_name;
+             current.size = prog_size;
+             if(!allocate_memory(&current)) {
+             	std::cerr << "ERROR: Memory allocation failed for exec program\n";
+             	}
 
-
-            system_status += "time: " + std::to_string(current_time) + "; current trace: " + trace + "\n";
-            system_status += print_PCB(current, wait_queue);
-            system_status += "\n";
+             system_status += "time: " + std::to_string(current_time) + "; current trace: " + trace + "\n";
+             system_status += print_PCB(current, wait_queue);
+             system_status += "\n";
 
 
 
