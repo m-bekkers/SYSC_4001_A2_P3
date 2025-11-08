@@ -50,7 +50,26 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
 
             ///////////////////////////////////////////////////////////////////////////////////////////
             //Add your FORK output here
+            execution += std::to_string(current_time) + ", 2, cloning the PCB\n";
+            current_time += 2;
 
+            // simulate fork creating a new child PCB
+            PCB child(current.PID + 1, current.PID, current.program_name + "_child", current.size, current.partition_number);
+            wait_queue.push_back(current); // parent waits, child runs
+
+            // Display system PCB table
+            system_status += "time: " + std::to_string(current_time) + ", after FORK\n";
+            system_status += print_PCB(child, wait_queue);
+            system_status += "\n";
+
+            execution += std::to_string(current_time) + ", 1, scheduler called\n";
+            current_time += 1;
+
+            execution += std::to_string(current_time) + ", 1, IRET\n";
+            current_time += 1;
+
+	    
+		
 
 
             ///////////////////////////////////////////////////////////////////////////////////////////
@@ -91,7 +110,15 @@ std::tuple<std::string, std::string, int> simulate_trace(std::vector<std::string
 
             ///////////////////////////////////////////////////////////////////////////////////////////
             //With the child's trace, run the child (HINT: think recursion)
-
+	    if(!child_trace.empty()) {
+                auto [child_exec, child_status, new_time] =
+                    simulate_trace(child_trace, current_time, vectors, delays, external_files, child,wait_queue);
+                execution += child_exec;
+                system_status += child_status;
+                current_time = new_time;
+            } else {
+                execution += std::to_string(current_time) + ", 0, no child trace found\n";
+            }
 
 
             ///////////////////////////////////////////////////////////////////////////////////////////
